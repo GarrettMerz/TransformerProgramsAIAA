@@ -7,7 +7,7 @@ from pathlib import Path
 import random
 import re
 import string
-
+import io
 import datasets
 import gensim.downloader
 from nltk.tokenize import word_tokenize
@@ -145,6 +145,25 @@ def make_most_freq(
         tags.append(t)
     return pd.DataFrame({"sent": sents, "tags": tags})
 
+def make_4loop(
+    vocab_size, dataset_size, min_length=6, max_length=6, seed=0
+):
+    #vocab = ['+', '-', 'a', 'b', 'c', 'd', 'e', 'f','g','h'] +[f"v{i:02d}" for i in range(93)]
+    path = "../ChromoBoot_data/processed_data/coef_from_word/old/4loop/4loop.data"
+    sents, tags = [], []
+    with io.open(path, mode="r", encoding="utf-8") as f:
+        # either reload the entire file, or the first N lines
+        # (for the training set)
+        lines = [line.rstrip().split("|") for line in f]
+        data = [xy.split("\t") for _, xy in lines]
+        data = [xy for xy in data if len(xy) == 2]
+        for xy in data:
+            sents.append([BOS] + xy[0].split(" ") + [EOS])
+            mytag = [BOS] + xy[1].split(" ") + [EOS]
+            mytag += [PAD]*(max_length - len(mytag))
+            tags.append(mytag)
+    return pd.DataFrame({"sent": sents, "tags": tags})
+    #return pd.DataFrame({"sent": sents, "tags":tags})
 
 def sample_dyck(vocab_size=1, max_depth=8, min_depth=1):
     vocab = [("(", ")"), ("{", "}")][:vocab_size]
@@ -233,6 +252,8 @@ def get_tokenizer(train, vocab_size=None, unk=False):
     idx_t = np.array(tags)
     t_idx = {t: i for i, t in enumerate(idx_t)}
     return idx_w, w_idx, idx_t, t_idx
+
+
 
 
 def tokenize(sents, w_idx, max_len=None):
@@ -607,6 +628,7 @@ def get_dataset(
         "dyck1": make_dyck_pft,
         "dyck2": make_dyck_pft,
         "sort": make_sort,
+        "4loop": make_4loop,
     }
     if name not in fns:
         raise NotImplementedError(name)
@@ -631,6 +653,7 @@ def get_dataset(
             max_length=max_length,
             seed=seed,
         )
+    print(df)
     train, test = train_test_split(df, test_size=test_size, random_state=seed)
     if get_val:
         train, val = train_test_split(
